@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Finlytics — painel de análise financeira. Carregue sua planilha de gastos e explore dashboards, filtros e relatórios. 100% no navegador, sem servidor e sem banco de dados.">
+<meta name="color-scheme" content="dark light">
+<title>Finlytics · Análise Financeira</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Cpath d='M7 22l6-7 4 3 8-10' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+<!-- ============ BARRA SUPERIOR ============ -->
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="marca">
+      <span class="marca-icone" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 3 7-9"/><path d="M3 21h18"/></svg>
+      </span>
+      <div class="marca-txt">
+        <strong>Finlytics</strong>
+        <small>Análise financeira</small>
+      </div>
+    </div>
+
+    <div class="arquivo-info oculto" id="arquivo-info">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      <span id="arquivo-nome">—</span>
+      <span class="ponto"></span>
+      <span id="arquivo-meta">—</span>
+    </div>
+
+    <div class="appbar-acoes">
+      <button class="btn btn-ghost" id="btn-tema" title="Alternar tema (tecla T)" aria-label="Alternar tema">
+        <svg class="ico-lua" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="ico-sol" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v2M12 20.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1.5 12h2M20.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
+      </button>
+
+      <div class="menu-wrap oculto" id="wrap-exportar">
+        <button class="btn btn-ghost" id="btn-exportar">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          <span class="so-desktop">Exportar</span>
+        </button>
+        <div class="menu" id="menu-exportar" role="menu">
+          <button class="menu-item" data-exportar="xlsx">Excel (.xlsx) com resumos</button>
+          <button class="menu-item" data-exportar="csv">CSV dos lançamentos filtrados</button>
+          <button class="menu-item" data-exportar="json">Backup JSON (base completa)</button>
+          <button class="menu-item" data-exportar="imprimir">Imprimir / Salvar em PDF</button>
+        </div>
+      </div>
+
+      <button class="btn btn-ghost oculto" id="btn-nova-planilha">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+          <span class="so-desktop">Planilha</span>
+      </button>
+
+      <button class="btn btn-perigo oculto" id="btn-limpar">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        <span class="so-desktop">Limpar dados</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ TELA INICIAL ============ -->
+<section class="tela" id="tela-inicial">
+  <div class="hero">
+    <span class="selo">Sem servidor · sem banco de dados · seus dados não saem do navegador</span>
+    <h1>Transforme sua planilha de gastos em um <span class="grad">painel financeiro</span></h1>
+    <p class="hero-sub">Carregue um arquivo <strong>.xlsx</strong>, <strong>.xls</strong> ou <strong>.csv</strong> e receba na hora indicadores, gráficos interativos, análises automáticas e uma tabela completa com filtros.</p>
+  </div>
+
+  <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Selecionar planilha">
+    <div class="dz-icone">
+      <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+    </div>
+    <h2>Arraste sua planilha aqui</h2>
+    <p>ou clique para escolher um arquivo — <code>.xlsx</code>, <code>.xls</code>, <code>.csv</code></p>
+    <div class="dz-acoes">
+      <button class="btn btn-primario" id="btn-escolher">Escolher planilha</button>
+      <button class="btn btn-ghost" id="btn-modelo">Baixar modelo</button>
+      <button class="btn btn-ghost" id="btn-exemplo">Ver com dados de exemplo</button>
+    </div>
+  </div>
+
+  <div class="colunas-esperadas">
+    <div class="ce-titulo">Colunas esperadas na planilha</div>
+    <div class="ce-grid">
+      <div class="ce-item"><span class="tag">Obrigatória</span><strong>Descrição do gasto</strong><small>Texto livre. Ex.: "Supermercado Extra"</small></div>
+      <div class="ce-item"><span class="tag">Obrigatória</span><strong>Valor</strong><small>Aceita 1.234,56 · R$ 1.234,56 · 1234.56</small></div>
+      <div class="ce-item"><span class="tag">Obrigatória</span><strong>Categoria</strong><small>Ex.: Alimentação, Moradia, Lazer</small></div>
+      <div class="ce-item"><span class="tag">Obrigatória</span><strong>Mês</strong><small>1–12, "Jan", "Janeiro" ou data</small></div>
+      <div class="ce-item"><span class="tag">Obrigatória</span><strong>Ano</strong><small>Ex.: 2025</small></div>
+      <div class="ce-item"><span class="tag tag-op">Opcional</span><strong>Tipo</strong><small>Receita ou Despesa — ativa fluxo de caixa e saldo</small></div>
+      <div class="ce-item"><span class="tag tag-op">Opcional</span><strong>Data</strong><small>Se existir, preenche mês/ano automaticamente</small></div>
+    </div>
+    <p class="ce-nota">A ordem das colunas não importa e variações de nome são reconhecidas (ex.: <em>Descrição</em>, <em>Gasto</em>, <em>Histórico</em>). A leitura acontece inteiramente no seu navegador.</p>
+  </div>
+
+  <div class="recursos">
+    <div class="rec"><span class="rec-ico">01</span><strong>9 gráficos interativos</strong><small>Fluxo de caixa, saldo acumulado, categorias, Pareto, comparativo anual, maiores gastos e mapa de calor.</small></div>
+    <div class="rec"><span class="rec-ico">02</span><strong>Filtros combinados</strong><small>Ano, mês, categoria, faixa de valor e busca textual — tudo reflete em todo o painel.</small></div>
+    <div class="rec"><span class="rec-ico">03</span><strong>Receitas e saldo</strong><small>Com a coluna Tipo, o painel calcula entradas, saídas, resultado do mês, caixa acumulado e taxa de poupança.</small></div>
+    <div class="rec"><span class="rec-ico">04</span><strong>Metas por categoria</strong><small>Defina um orçamento mensal e acompanhe quanto já foi consumido.</small></div>
+    <div class="rec"><span class="rec-ico">05</span><strong>Análises automáticas</strong><small>Tendência, concentração 80/20, custo fixo, gastos recorrentes, outliers e meses no vermelho.</small></div>
+    <div class="rec"><span class="rec-ico">06</span><strong>Tabela completa</strong><small>Ordenação por qualquer coluna, paginação e participação de cada lançamento no total.</small></div>
+    <div class="rec"><span class="rec-ico">07</span><strong>Cache local</strong><small>Os dados ficam só no seu navegador e podem ser apagados com um clique.</small></div>
+    <div class="rec"><span class="rec-ico">08</span><strong>Exportação</strong><small>Excel com resumos, CSV filtrado, backup JSON, PNG dos gráficos e PDF.</small></div>
+  </div>
+</section>
+
+<!-- ============ PAINEL ============ -->
+<section class="tela oculto" id="tela-painel">
+
+  <!-- FILTROS -->
+  <div class="filtros card" id="filtros">
+    <div class="filtros-grid">
+      <label class="campo campo-busca">
+        <span>Buscar</span>
+        <div class="input-ico">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input type="search" id="f-busca" placeholder="descrição ou categoria..." autocomplete="off">
+        </div>
+      </label>
+      <div class="campo">
+        <span>Ano</span>
+        <div id="f-ano"></div>
+      </div>
+      <div class="campo">
+        <span>Categoria</span>
+        <div id="f-categoria"></div>
+      </div>
+      <div class="campo campo-faixa">
+        <span>Faixa de valor</span>
+        <div class="faixa">
+          <input type="number" id="f-min" placeholder="mín" step="0.01" inputmode="decimal">
+          <em>—</em>
+          <input type="number" id="f-max" placeholder="máx" step="0.01" inputmode="decimal">
+        </div>
+      </div>
+    </div>
+
+    <div class="filtros-meses oculto" id="filtros-tipo">
+      <span class="fm-rotulo">Tipo</span>
+      <div class="chips" id="chips-tipo">
+        <button type="button" class="chip ativo" data-tipo="todos">Tudo</button>
+        <button type="button" class="chip chip-receita" data-tipo="receita">Receitas</button>
+        <button type="button" class="chip chip-despesa" data-tipo="despesa">Despesas</button>
+      </div>
+    </div>
+
+    <div class="filtros-meses">
+      <span class="fm-rotulo">Mês</span>
+      <div class="chips" id="chips-meses"></div>
+      <button class="btn btn-ghost btn-sm" id="btn-limpar-filtros">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        Limpar filtros
+      </button>
+    </div>
+
+    <div class="filtros-resumo" id="filtros-resumo"></div>
+  </div>
+
+  <!-- ABAS -->
+  <nav class="abas" role="tablist">
+    <button class="aba ativa" data-aba="visao" role="tab">Visão geral</button>
+    <button class="aba oculto" data-aba="fluxo" role="tab" id="aba-fluxo">Fluxo de caixa</button>
+    <button class="aba" data-aba="analise" role="tab">Análises</button>
+    <button class="aba" data-aba="lancamentos" role="tab">Lançamentos</button>
+    <button class="aba" data-aba="metas" role="tab">Metas</button>
+  </nav>
+
+  <!-- ABA: VISÃO GERAL -->
+  <div class="conteudo-aba ativa" data-painel="visao">
+    <div class="kpis" id="kpis"></div>
+
+    <div class="grid-2">
+      <div class="card grafico" style="--altura:340px">
+        <div class="card-head">
+          <div>
+            <h3 id="tit-evolucao">Evolução dos gastos</h3>
+            <p id="sub-evolucao">Total por mês com média móvel de 3 períodos</p>
+          </div>
+          <div class="card-acoes">
+            <button class="btn-icone" data-png="g-evolucao" title="Baixar PNG">&#8681;</button>
+          </div>
+        </div>
+        <div class="canvas-wrap"><canvas id="g-evolucao"></canvas></div>
+      </div>
+
+      <div class="card grafico" style="--altura:340px">
+        <div class="card-head">
+          <div>
+            <h3 id="tit-categorias">Distribuição por categoria</h3>
+            <p id="sub-categorias">Participação de cada categoria no período filtrado</p>
+          </div>
+          <div class="card-acoes">
+            <button class="btn-icone" data-png="g-categorias" title="Baixar PNG">&#8681;</button>
+          </div>
+        </div>
+        <div class="canvas-wrap"><canvas id="g-categorias"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card grafico" style="--altura:300px">
+        <div class="card-head">
+          <div>
+            <h3 id="tit-acumulado">Gasto acumulado</h3>
+            <p id="sub-acumulado">Soma acumulada ao longo dos meses selecionados</p>
+          </div>
+          <div class="card-acoes">
+            <button class="btn-icone" data-png="g-acumulado" title="Baixar PNG">&#8681;</button>
+          </div>
+        </div>
+        <div class="canvas-wrap"><canvas id="g-acumulado"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3 id="tit-resumo-cat">Resumo por categoria</h3>
+            <p>Valores, participação e média por mês</p>
+          </div>
+        </div>
+        <div class="mini-tabela-wrap"><table class="mini-tabela" id="resumo-categorias"></table></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h3>Análises automáticas</h3>
+          <p>Leituras geradas a partir dos dados filtrados</p>
+        </div>
+      </div>
+      <div class="insights" id="insights"></div>
+    </div>
+  </div>
+
+  <!-- ABA: FLUXO DE CAIXA -->
+  <div class="conteudo-aba" data-painel="fluxo">
+    <div class="fluxo-destaques" id="fluxo-destaques"></div>
+
+    <div class="card grafico" style="--altura:330px">
+      <div class="card-head">
+        <div>
+          <h3>Saldo mensal e acumulado</h3>
+          <p>Barras verdes são meses no azul, vermelhas no vermelho; a linha mostra o caixa acumulado</p>
+        </div>
+        <div class="card-acoes"><button class="btn-icone" data-png="g-saldo" title="Baixar PNG">&#8681;</button></div>
+      </div>
+      <div class="canvas-wrap"><canvas id="g-saldo"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h3>Fluxo de caixa mês a mês</h3>
+          <p>Entradas, saídas, resultado do mês, caixa acumulado e taxa de poupança</p>
+        </div>
+      </div>
+      <div class="tabela-wrap"><table class="tabela" id="tabela-fluxo"></table></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card grafico" style="--altura:320px">
+        <div class="card-head">
+          <div>
+            <h3>Receitas por categoria</h3>
+            <p>De onde vem o dinheiro no período filtrado</p>
+          </div>
+          <div class="card-acoes"><button class="btn-icone" data-png="g-receitas" title="Baixar PNG">&#8681;</button></div>
+        </div>
+        <div class="canvas-wrap"><canvas id="g-receitas"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Maiores receitas</h3>
+            <p>Os 10 maiores lançamentos de entrada</p>
+          </div>
+        </div>
+        <div class="mini-tabela-wrap"><table class="mini-tabela" id="top-receitas"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABA: ANÁLISES -->
+  <div class="conteudo-aba" data-painel="analise">
+    <div class="grid-2">
+      <div class="card grafico" style="--altura:340px">
+        <div class="card-head">
+          <div>
+            <h3>Curva de Pareto (80/20)</h3>
+            <p>Quais categorias concentram a maior parte do gasto</p>
+          </div>
+          <div class="card-acoes"><button class="btn-icone" data-png="g-pareto" title="Baixar PNG">&#8681;</button></div>
+        </div>
+        <div class="canvas-wrap"><canvas id="g-pareto"></canvas></div>
+      </div>
+
+      <div class="card grafico" style="--altura:340px">
+        <div class="card-head">
+          <div>
+            <h3>Maiores lançamentos</h3>
+            <p>Top 10 gastos individuais do período</p>
+          </div>
+          <div class="card-acoes"><button class="btn-icone" data-png="g-top" title="Baixar PNG">&#8681;</button></div>
+        </div>
+        <div class="canvas-wrap"><canvas id="g-top"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card grafico" style="--altura:330px">
+      <div class="card-head">
+        <div>
+          <h3>Comparativo entre anos</h3>
+          <p>Mesmo mês, anos diferentes — útil para enxergar sazonalidade</p>
+        </div>
+        <div class="card-acoes"><button class="btn-icone" data-png="g-anos" title="Baixar PNG">&#8681;</button></div>
+      </div>
+      <div class="canvas-wrap"><canvas id="g-anos"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h3>Mapa de calor · categoria × mês</h3>
+          <p>Intensidade proporcional ao valor gasto</p>
+        </div>
+      </div>
+      <div class="heatmap-wrap"><div id="heatmap"></div></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Gastos recorrentes</h3>
+            <p>Descrições que se repetem em 3 meses ou mais</p>
+          </div>
+        </div>
+        <div class="mini-tabela-wrap"><table class="mini-tabela" id="recorrentes"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Lançamentos atípicos</h3>
+            <p>Valores muito acima do padrão da própria categoria</p>
+          </div>
+        </div>
+        <div class="mini-tabela-wrap"><table class="mini-tabela" id="outliers"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABA: LANÇAMENTOS -->
+  <div class="conteudo-aba" data-painel="lancamentos">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h3>Lançamentos</h3>
+          <p id="tabela-sub">—</p>
+        </div>
+        <div class="card-acoes">
+          <label class="sel-inline">Linhas
+            <select id="por-pagina">
+              <option>10</option><option selected>25</option><option>50</option><option>100</option><option value="todos">Todas</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="tabela-wrap">
+        <table class="tabela" id="tabela">
+          <thead>
+            <tr>
+              <th data-campo="descricao" class="ord">Descrição</th>
+              <th data-campo="tipo" class="ord col-tipo">Tipo</th>
+              <th data-campo="categoria" class="ord">Categoria</th>
+              <th data-campo="periodo" class="ord">Período</th>
+              <th data-campo="valor" class="ord num">Valor</th>
+              <th class="num" id="th-pct">% do total</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-corpo"></tbody>
+          <tfoot id="tabela-rodape"></tfoot>
+        </table>
+      </div>
+      <div class="paginacao" id="paginacao"></div>
+    </div>
+  </div>
+
+  <!-- ABA: METAS -->
+  <div class="conteudo-aba" data-painel="metas">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h3>Metas mensais por categoria</h3>
+          <p>Defina um teto de gasto mensal. A comparação usa a média mensal do período filtrado. As metas ficam salvas no cache do navegador.</p>
+        </div>
+        <div class="card-acoes">
+          <button class="btn btn-ghost btn-sm" id="btn-sugerir-metas" title="Preenche com a média mensal atual">Sugerir pela média</button>
+          <button class="btn btn-ghost btn-sm" id="btn-zerar-metas">Zerar metas</button>
+        </div>
+      </div>
+      <div class="metas-resumo" id="metas-resumo"></div>
+      <div class="metas-lista" id="metas-lista"></div>
+    </div>
+  </div>
+
+</section>
+</main>
+
+<footer class="rodape">
+  <span>Finlytics · análise financeira local</span>
+  <span class="ponto"></span>
+  <span>Nenhum dado é enviado para servidores — tudo roda no seu navegador e fica no cache local.</span>
+</footer>
+
+<input type="file" id="input-arquivo" accept=".xlsx,.xls,.xlsm,.csv,.txt" hidden>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<div class="modal-fundo oculto" id="modal-fundo">
+  <div class="modal card" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+    <h3 id="modal-titulo"></h3>
+    <div id="modal-corpo"></div>
+    <div class="modal-acoes" id="modal-acoes"></div>
+  </div>
+</div>
+<div class="carregando oculto" id="carregando"><div class="spinner"></div><span>Processando planilha…</span></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="assets/js/utils.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/parser.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/graficos.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
