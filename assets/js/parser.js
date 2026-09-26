@@ -180,7 +180,7 @@
 
       var linhas = [], ignoradas = 0;
       var motivos = { semValor: 0, semPeriodo: 0, vazia: 0, tipoIndefinido: 0 };
-      var total = 0, receitas = 0;
+      var total = 0, contagem = { receita: 0, despesa: 0, investimento: 0 };
 
       for (var i = cab.indice + 1; i < matriz.length; i++) {
         var l = matriz[i] || [];
@@ -212,7 +212,7 @@
           if (!tipo) motivos.tipoIndefinido++;
         }
         if (!tipo) tipo = 'despesa';             // sem coluna Tipo, tudo é despesa
-        if (tipo === 'receita') receitas++;
+        contagem[tipo]++;
 
         linhas.push(Store.montarLinha({
           descricao: descricao || '(sem descrição)',
@@ -231,8 +231,10 @@
         ignoradas: ignoradas,
         motivos: motivos,
         totalLidas: total,
-        receitas: receitas,
-        despesas: linhas.length - receitas,
+        contagem: contagem,
+        receitas: contagem.receita,
+        despesas: contagem.despesa,
+        investimentos: contagem.investimento,
         comColunaTipo: mapa.tipo != null,
         tipoReclassificado: tipoReclassificado,
         aba: extraido.aba,
@@ -271,7 +273,9 @@
     ['Conta de luz', 187.9, 'Moradia', 1, 2025, 'Despesa'],
     ['Combustível', 420, 'Transporte', 1, 2025, 'Despesa'],
     ['Plano de saúde', 640, 'Saúde', 1, 2025, 'Despesa'],
-    ['Streaming', 55.9, 'Lazer', 1, 2025, 'Despesa']
+    ['Streaming', 55.9, 'Lazer', 1, 2025, 'Despesa'],
+    ['Aporte Tesouro Direto', 1000, 'Renda fixa', 1, 2025, 'Investimento'],
+    ['Compra de ações', 500, 'Ações', 1, 2025, 'Investimento']
   ];
 
   function baixarModelo() {
@@ -322,6 +326,7 @@
     var semente = 20250926;
     function rnd() { semente = (semente * 9301 + 49297) % 233280; return semente / 233280; }
     function receita(desc, valor, categoria, mes, ano) { linhas.push([desc, valor, categoria, mes, ano, 'receita']); }
+    function aporte(desc, valor, categoria, mes, ano) { linhas.push([desc, valor, categoria, mes, ano, 'investimento']); }
 
     [anoAtual - 1, anoAtual].forEach(function (ano, idxAno) {
       var mesLimite = ano === anoAtual ? mesAtual : 12;
@@ -335,6 +340,13 @@
         if (mes === 12) receita('13º salário', Math.round(29500 * reajusteRenda * 100) / 100, 'Salário', mes, ano);
         if (mes === 3) receita('Restituição do IR', Math.round((900 + rnd() * 2200) * 100) / 100, 'Outras receitas', mes, ano);
         if (rnd() < .18) receita('Venda de usados', Math.round((120 + rnd() * 900) * 100) / 100, 'Outras receitas', mes, ano);
+
+        /* ---- aportes do mês ---- */
+        aporte('Aporte Tesouro Direto', Math.round(1800 * reajusteRenda * 100) / 100, 'Renda fixa', mes, ano);
+        aporte('Previdência privada', 800, 'Previdência', mes, ano);
+        if (rnd() < .7) aporte('Compra de ações', Math.round((400 + rnd() * 1600) * 100) / 100, 'Ações', mes, ano);
+        if (rnd() < .5) aporte('Fundo imobiliário', Math.round((300 + rnd() * 900) * 100) / 100, 'Fundos imobiliários', mes, ano);
+        if (mes === 12) aporte('Aporte extra do 13º', Math.round(9000 * reajusteRenda * 100) / 100, 'Renda fixa', mes, ano);
 
         /* ---- despesas do mês ---- */
         // sazonalidade: dezembro e julho gastam mais

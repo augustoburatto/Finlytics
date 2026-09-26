@@ -97,7 +97,7 @@
       <div class="ce-item"><span class="tag">Obrigatória</span><strong>Categoria</strong><small>Ex.: Alimentação, Moradia, Lazer</small></div>
       <div class="ce-item"><span class="tag">Obrigatória</span><strong>Mês</strong><small>1–12, "Jan", "Janeiro" ou data</small></div>
       <div class="ce-item"><span class="tag">Obrigatória</span><strong>Ano</strong><small>Ex.: 2025</small></div>
-      <div class="ce-item"><span class="tag tag-op">Opcional</span><strong>Tipo</strong><small>Receita ou Despesa — ativa fluxo de caixa e saldo</small></div>
+      <div class="ce-item"><span class="tag tag-op">Opcional</span><strong>Tipo</strong><small>Receita, Despesa ou Investimento — ativa fluxo de caixa, saldo e patrimônio</small></div>
       <div class="ce-item"><span class="tag tag-op">Opcional</span><strong>Data</strong><small>Se existir, preenche mês/ano automaticamente</small></div>
     </div>
     <p class="ce-nota">A ordem das colunas não importa e variações de nome são reconhecidas (ex.: <em>Descrição</em>, <em>Gasto</em>, <em>Histórico</em>). A leitura acontece inteiramente no seu navegador.</p>
@@ -106,7 +106,7 @@
   <div class="recursos">
     <div class="rec"><span class="rec-ico">01</span><strong>9 gráficos interativos</strong><small>Fluxo de caixa, saldo acumulado, categorias, Pareto, comparativo anual, maiores gastos e mapa de calor.</small></div>
     <div class="rec"><span class="rec-ico">02</span><strong>Filtros combinados</strong><small>Ano, mês, categoria, faixa de valor e busca textual — tudo reflete em todo o painel.</small></div>
-    <div class="rec"><span class="rec-ico">03</span><strong>Receitas e saldo</strong><small>Com a coluna Tipo, o painel calcula entradas, saídas, resultado do mês, caixa acumulado e taxa de poupança.</small></div>
+    <div class="rec"><span class="rec-ico">03</span><strong>Receitas, aportes e saldo</strong><small>Com a coluna Tipo, o painel separa gasto de investimento e calcula sobra, caixa acumulado, patrimônio investido e taxa de poupança.</small></div>
     <div class="rec"><span class="rec-ico">04</span><strong>Metas por categoria</strong><small>Defina um orçamento mensal e acompanhe quanto já foi consumido.</small></div>
     <div class="rec"><span class="rec-ico">05</span><strong>Análises automáticas</strong><small>Tendência, concentração 80/20, custo fixo, gastos recorrentes, outliers e meses no vermelho.</small></div>
     <div class="rec"><span class="rec-ico">06</span><strong>Tabela completa</strong><small>Ordenação por qualquer coluna, paginação e participação de cada lançamento no total.</small></div>
@@ -152,6 +152,7 @@
         <button type="button" class="chip ativo" data-tipo="todos">Tudo</button>
         <button type="button" class="chip chip-receita" data-tipo="receita">Receitas</button>
         <button type="button" class="chip chip-despesa" data-tipo="despesa">Despesas</button>
+        <button type="button" class="chip chip-investimento" data-tipo="investimento">Investimentos</button>
       </div>
     </div>
 
@@ -290,6 +291,16 @@
         </div>
         <div class="mini-tabela-wrap"><table class="mini-tabela" id="top-receitas"></table></div>
       </div>
+    </div>
+
+    <div class="card oculto" id="card-aportes">
+      <div class="card-head">
+        <div>
+          <h3>Investimentos por destino</h3>
+          <p>Para onde foram os aportes do período — aporte sai do caixa, mas vira patrimônio</p>
+        </div>
+      </div>
+      <div class="mini-tabela-wrap"><table class="mini-tabela" id="aportes-categoria"></table></div>
     </div>
   </div>
 

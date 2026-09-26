@@ -23,11 +23,14 @@
 
   /**
    * Formato compacto em disco: [descricao, valor, categoria, mes, ano, tipo]
-   * tipo: 1 = receita, 0/ausente = despesa (bases antigas seguem funcionando).
+   * tipo: 1 = receita, 2 = investimento, 0/ausente = despesa
+   * (bases antigas, sem a sexta posição, seguem funcionando).
    */
+  var COD = { receita: 1, investimento: 2, despesa: 0 };
+
   function compactar(linhas) {
     return linhas.map(function (l) {
-      return [l.descricao, l.valor, l.categoria, l.mes, l.ano, l.tipo === 'receita' ? 1 : 0];
+      return [l.descricao, l.valor, l.categoria, l.mes, l.ano, COD[l.tipo] || 0];
     });
   }
 
@@ -35,14 +38,14 @@
     return arr.map(function (a, i) {
       return montarLinha({
         descricao: a[0], valor: a[1], categoria: a[2], mes: a[3], ano: a[4],
-        tipo: a[5] === 1 ? 'receita' : 'despesa'
+        tipo: a[5] === 1 ? 'receita' : (a[5] === 2 ? 'investimento' : 'despesa')
       }, i);
     });
   }
 
   /** Cria a linha canônica usada em todo o app (com campos derivados). */
   function montarLinha(d, indice) {
-    var tipo = d.tipo === 'receita' ? 'receita' : 'despesa';
+    var tipo = (d.tipo === 'receita' || d.tipo === 'investimento') ? d.tipo : 'despesa';
     return {
       id: indice,
       descricao: d.descricao,
@@ -52,6 +55,7 @@
       ano: d.ano,
       tipo: tipo,
       receita: tipo === 'receita',
+      investimento: tipo === 'investimento',
       sinal: tipo === 'receita' ? d.valor : -d.valor,
       periodo: Util.chavePeriodo(d.ano, d.mes),
       rotulo: Util.rotuloPeriodo(d.mes, d.ano),

@@ -46,22 +46,40 @@ Aceita `.xlsx`, `.xls` e `.csv`. A ordem das colunas não importa e variações 
 | Categoria | sim | também aceita *Classificação*, *Grupo*, *Rubrica*, *Tipo de gasto* |
 | Mês | sim | `1`–`12`, `Jan`, `Janeiro`, `03/2025` ou uma data |
 | Ano | sim | `2025` ou `25` |
-| **Tipo** | não | `Receita`/`Despesa`, `Entrada`/`Saída`, `Crédito`/`Débito`, `C`/`D`, `+`/`−`. Ativa fluxo de caixa e saldo |
+| **Tipo** | não | `Receita`, `Despesa` ou `Investimento`. Ativa fluxo de caixa, saldo e patrimônio |
 | Data | não | se existir, preenche mês e ano automaticamente |
 
-### A coluna Tipo (receita/despesa)
+### A coluna Tipo (receita / despesa / investimento)
 
 É opcional e muda o painel inteiro quando existe:
 
 - **sem a coluna** — tudo é despesa e o site funciona exatamente como antes (planilhas antigas continuam valendo);
-- **com a coluna** — surgem a aba **Fluxo de caixa**, o filtro **Tipo** (tudo / receitas / despesas) e os indicadores de receitas, saldo e taxa de poupança.
+- **com a coluna** — surgem a aba **Fluxo de caixa**, o filtro **Tipo** e os indicadores de receitas, sobra, aportes, saldo em caixa e taxa de poupança.
+
+Grafias reconhecidas (maiúsculas e acentos não importam):
+
+| Tipo | Aceita |
+|---|---|
+| Receita | `Receita`, `Entrada`, `Crédito`, `Ganho`, `Provento`, `Salário`, `R`, `C`, `+` |
+| Despesa | `Despesa`, `Saída`, `Débito`, `Gasto`, `Custo`, `Pagamento`, `D`, `S`, `−` |
+| Investimento | `Investimento`, `Aporte`, `Aplicação`, `Previdência`, `Poupança`, `I`, `Inv` |
+
+**Por que investimento não é despesa:** um aporte sai do caixa, mas vira patrimônio — não é consumo. Por isso ele é somado à parte:
+
+```
+Sobra          = Receitas − Despesas
+Saldo em caixa = Sobra − Investimentos
+```
+
+O painel mostra as duas linhas: a **sobra** (quanto o mês gerou) e o **saldo em caixa** (quanto ficou livre depois dos aportes), além do **patrimônio investido acumulado**. Assim, investir bastante não aparece como se você tivesse gasto demais.
 
 Detalhes do comportamento:
 
 - o sinal vem do tipo, não do número: `-150` numa linha marcada como despesa continua sendo uma saída de R$ 150;
 - linha com tipo em branco ou irreconhecível é tratada como despesa, e o aviso de importação informa quantas foram;
 - se a coluna chamada "Tipo" na verdade guarda categorias (`Moradia`, `Lazer`…), o app percebe pelos valores e a usa como categoria, avisando na tela;
-- análises de gasto (Pareto, mapa de calor, metas, recorrentes, outliers, categoria líder) consideram **apenas despesas**. Filtrando só receitas, esses mesmos painéis passam a analisar as receitas.
+- análises de gasto (Pareto, mapa de calor, metas, recorrentes, outliers, categoria líder) consideram **apenas despesas** — aportes não contam como gasto nem entram nas metas. Filtrando só receitas ou só investimentos, esses mesmos painéis passam a analisar aquele lado;
+- a categoria da linha de investimento vira o destino do aporte (`Renda fixa`, `Ações`, `Fundos imobiliários`…), usada no quadro "Investimentos por destino".
 
 Detalhes do processamento:
 
@@ -77,11 +95,11 @@ Use o botão **Baixar modelo** na tela inicial para gerar uma planilha já no fo
 
 ## O que o painel entrega
 
-**Indicadores** — adaptam-se à planilha. Sem receitas: total gasto, média mensal, variação do último mês, nº de lançamentos, ticket médio e mediana, categoria líder e projeção de fechamento do ano. Com receitas: receitas, despesas, saldo do período, taxa de poupança, despesa média mensal, variação, categoria líder e projeção.
+**Indicadores** — adaptam-se à planilha. Sem receitas: total gasto, média mensal, variação do último mês, nº de lançamentos, ticket médio e mediana, categoria líder e projeção de fechamento do ano. Com receitas: receitas, despesas, sobra do período, taxa de poupança, despesa média mensal, variação, categoria líder e projeção. Com investimentos, entram ainda o total investido (com o % da renda) e o saldo em caixa.
 
 **Visão geral** — evolução mensal com média móvel de 3 meses (ou gráfico de fluxo de caixa, quando há receitas), distribuição por categoria em rosca, curva de gasto/saldo acumulado, tabela-resumo por categoria e um bloco de análises automáticas.
 
-**Fluxo de caixa** (aba que aparece quando a planilha tem receitas) — entradas, saídas e resultado do período, melhor e pior mês, gráfico de saldo mensal com caixa acumulado, tabela mês a mês (entradas, saídas, resultado, caixa acumulado e taxa de poupança) e as maiores receitas por categoria e por lançamento.
+**Fluxo de caixa** (aba que aparece quando a planilha tem receitas ou investimentos) — entradas, saídas, aportes, sobra e saldo em caixa do período, melhor e pior mês, gráfico de saldo mensal com caixa acumulado e linha de patrimônio investido, tabela mês a mês (entradas, saídas, aportes, sobra, caixa do mês, caixa acumulado, total investido e taxa de poupança), receitas por categoria e por lançamento, e o quadro de investimentos por destino.
 
 **Análises** — curva de Pareto (quais categorias formam 80% do gasto), top 10 maiores lançamentos, comparativo entre anos mês a mês, mapa de calor categoria × mês, detecção de gastos recorrentes (custo fixo estimado) e de lançamentos atípicos (z-score por categoria).
 
@@ -89,9 +107,9 @@ Use o botão **Baixar modelo** na tela inicial para gerar uma planilha já no fo
 
 **Metas** — orçamento mensal por categoria com barra de progresso, folga/estouro consolidado e botão para sugerir metas a partir da média atual. Ficam salvas no cache.
 
-**Filtros combinados** — tipo (receita/despesa), ano, mês, categoria, faixa de valor e busca textual; tudo recalcula em conjunto e vale para todas as abas e exportações.
+**Filtros combinados** — tipo (receita / despesa / investimento), ano, mês, categoria, faixa de valor e busca textual; tudo recalcula em conjunto e vale para todas as abas e exportações.
 
-**Exportações** — Excel com três abas (lançamentos, resumo por categoria, resumo por mês) ou cinco quando há receitas (+ receitas por categoria e fluxo de caixa mês a mês), CSV do recorte filtrado, backup JSON da base completa, PNG de cada gráfico e impressão/PDF com layout próprio.
+**Exportações** — Excel com três abas (lançamentos, resumo por categoria, resumo por mês), cinco quando há receitas (+ receitas por categoria e fluxo de caixa mês a mês) e seis quando há aportes (+ investimentos por destino), CSV do recorte filtrado, backup JSON da base completa, PNG de cada gráfico e impressão/PDF com layout próprio.
 
 **Outros** — tema claro/escuro persistido, layout responsivo, arrastar e soltar o arquivo em qualquer ponto da página, dados de exemplo para explorar sem planilha, atalhos `T` (tema) e `F` (busca).
 

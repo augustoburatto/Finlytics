@@ -165,32 +165,37 @@
     op.plugins.tooltip.callbacks = {
       label: function (ctx) { return ctx.dataset.label + ': ' + Util.moeda(Math.abs(ctx.parsed.y)); }
     };
+    var barra = { borderWidth: 1, borderRadius: 5, borderSkipped: false, maxBarThickness: 28, order: 3 };
+    var datasets = [
+      Object.assign({
+        label: 'Receitas', data: dados.receitas, stack: 'entradas',
+        backgroundColor: Util.hexAlfa(Util.TIPO_COR.receita, .75), borderColor: Util.TIPO_COR.receita
+      }, barra),
+      Object.assign({
+        label: 'Despesas', data: dados.despesas.map(function (v) { return -v; }), stack: 'saidas',
+        backgroundColor: Util.hexAlfa(Util.TIPO_COR.despesa, .75), borderColor: Util.TIPO_COR.despesa
+      }, barra)
+    ];
+    if (dados.temInvestimentos) {
+      datasets.push(Object.assign({
+        label: 'Investimentos', data: dados.investimentos.map(function (v) { return -v; }), stack: 'saidas',
+        backgroundColor: Util.hexAlfa(Util.TIPO_COR.investimento, .8), borderColor: Util.TIPO_COR.investimento
+      }, barra));
+    }
+    datasets.push({
+      label: 'Saldo em caixa', data: dados.saldo, type: 'line',
+      borderColor: c.s1, backgroundColor: c.s1, borderWidth: 2.2,
+      tension: .3, pointRadius: 2.5, pointHoverRadius: 5, order: 1
+    });
+
     render('g-evolucao', {
       type: 'bar',
-      data: {
-        labels: dados.rotulos,
-        datasets: [
-          {
-            label: 'Receitas', data: dados.receitas,
-            backgroundColor: Util.hexAlfa('#34d399', .75), borderColor: '#34d399', borderWidth: 1,
-            borderRadius: 6, borderSkipped: false, maxBarThickness: 26, order: 3
-          },
-          {
-            label: 'Despesas', data: dados.despesas.map(function (v) { return -v; }),
-            backgroundColor: Util.hexAlfa('#fb7185', .75), borderColor: '#fb7185', borderWidth: 1,
-            borderRadius: 6, borderSkipped: false, maxBarThickness: 26, order: 3
-          },
-          {
-            label: 'Saldo do mês', data: dados.saldo, type: 'line',
-            borderColor: c.s1, backgroundColor: c.s1, borderWidth: 2.2,
-            tension: .3, pointRadius: 2.5, pointHoverRadius: 5, order: 1
-          }
-        ]
-      },
+      data: { labels: dados.rotulos, datasets: datasets },
       options: Object.assign(op, {
         scales: {
-          x: eixoCategoria(c, { stacked: false, grid: { display: false } }),
+          x: eixoCategoria(c, { stacked: true, grid: { display: false } }),
           y: eixoValor(c, {
+            stacked: true,
             grid: { color: c.grade, drawTicks: false },
             ticks: { color: c.texto, padding: 8, font: { family: 'Inter', size: 11 },
                      callback: function (v) { return Util.moeda(Math.abs(v), true); } }
@@ -207,26 +212,34 @@
     op.plugins.tooltip.callbacks = {
       label: function (ctx) { return ctx.dataset.label + ': ' + Util.moeda(ctx.parsed.y); }
     };
+    var conjuntos = [
+      {
+        label: 'Saldo do mês', data: dados.saldos,
+        backgroundColor: dados.saldos.map(function (v) {
+          return Util.hexAlfa(v >= 0 ? Util.TIPO_COR.receita : Util.TIPO_COR.despesa, .72);
+        }),
+        borderColor: dados.saldos.map(function (v) {
+          return v >= 0 ? Util.TIPO_COR.receita : Util.TIPO_COR.despesa;
+        }),
+        borderWidth: 1, borderRadius: 6, borderSkipped: false, maxBarThickness: 40, order: 3
+      },
+      {
+        label: 'Caixa acumulado', data: dados.acumulado, type: 'line', yAxisID: 'y2',
+        borderColor: c.s1, backgroundColor: Util.hexAlfa('#6366f1', .1),
+        borderWidth: 2.4, tension: .3, pointRadius: 0, pointHoverRadius: 5, fill: true, order: 2
+      }
+    ];
+    if (dados.investido) {
+      conjuntos.push({
+        label: 'Total investido', data: dados.investido, type: 'line', yAxisID: 'y2',
+        borderColor: Util.TIPO_COR.investimento, backgroundColor: Util.TIPO_COR.investimento,
+        borderWidth: 2.2, borderDash: [5, 4], tension: .3, pointRadius: 0, pointHoverRadius: 5, order: 1
+      });
+    }
+
     render('g-saldo', {
       type: 'bar',
-      data: {
-        labels: dados.rotulos,
-        datasets: [
-          {
-            label: 'Saldo do mês', data: dados.saldos,
-            backgroundColor: dados.saldos.map(function (v) {
-              return Util.hexAlfa(v >= 0 ? '#34d399' : '#fb7185', .72);
-            }),
-            borderColor: dados.saldos.map(function (v) { return v >= 0 ? '#34d399' : '#fb7185'; }),
-            borderWidth: 1, borderRadius: 6, borderSkipped: false, maxBarThickness: 40, order: 2
-          },
-          {
-            label: 'Saldo acumulado', data: dados.acumulado, type: 'line', yAxisID: 'y2',
-            borderColor: c.s1, backgroundColor: Util.hexAlfa('#6366f1', .1),
-            borderWidth: 2.4, tension: .3, pointRadius: 0, pointHoverRadius: 5, fill: true, order: 1
-          }
-        ]
-      },
+      data: { labels: dados.rotulos, datasets: conjuntos },
       options: Object.assign(op, {
         scales: {
           x: eixoCategoria(c),

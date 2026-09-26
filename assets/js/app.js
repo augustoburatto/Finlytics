@@ -251,7 +251,8 @@
 
     var detalhes = [];
     if (res.comColunaTipo) {
-      detalhes.push(Util.inteiro(res.receitas) + ' receitas e ' + Util.inteiro(res.despesas) + ' despesas');
+      detalhes.push(Util.inteiro(res.receitas) + ' receitas, ' + Util.inteiro(res.despesas) + ' despesas' +
+        (res.investimentos ? ' e ' + Util.inteiro(res.investimentos) + ' investimentos' : ''));
     }
     if (res.ignoradas) detalhes.push(Util.inteiro(res.ignoradas) + ' linha(s) ignorada(s)');
     if (res.motivos && res.motivos.semValor) detalhes.push(res.motivos.semValor + ' sem valor numérico');
@@ -294,11 +295,16 @@
     $('#wrap-exportar').classList.remove('oculto');
     $('#arquivo-info').classList.remove('oculto');
 
-    // fluxo de caixa só aparece quando a base tem receitas
-    var comReceitas = baseTemReceitas();
-    $('#filtros-tipo').classList.toggle('oculto', !comReceitas);
-    $('#aba-fluxo').classList.toggle('oculto', !comReceitas);
-    if (!comReceitas && estado.aba === 'fluxo') trocarAba('visao');
+    // fluxo de caixa só aparece quando a base tem receitas ou investimentos
+    var comFluxo = baseTemFluxo();
+    $('#filtros-tipo').classList.toggle('oculto', !comFluxo);
+    $('#aba-fluxo').classList.toggle('oculto', !comFluxo);
+    // o chip de cada tipo só existe se a base tiver aquele tipo
+    $$('#chips-tipo .chip').forEach(function (c) {
+      var t = c.dataset.tipo;
+      c.classList.toggle('oculto', t !== 'todos' && !baseTem(t));
+    });
+    if (!comFluxo && estado.aba === 'fluxo') trocarAba('visao');
 
     $('#arquivo-nome').textContent = estado.meta.arquivo || 'planilha';
     var kb = Store.tamanhoAproximado() / 1024;
@@ -445,41 +451,66 @@
   /* ============================================================
      Receitas x despesas
      ============================================================ */
-  /** A base tem pelo menos uma receita? Decide todo o modo "fluxo de caixa". */
-  function baseTemReceitas() {
-    return estado.linhas.some(function (l) { return l.receita; });
+  /** A base tem algo além de despesa? Decide todo o modo "fluxo de caixa". */
+  function baseTemFluxo() {
+    return estado.linhas.some(function (l) { return l.tipo !== 'despesa'; });
+  }
+  function baseTem(tipo) {
+    return estado.linhas.some(function (l) { return l.tipo === tipo; });
   }
 
-  function despesasDe(linhas) { return linhas.filter(function (l) { return !l.receita; }); }
-  function receitasDe(linhas) { return linhas.filter(function (l) { return l.receita; }); }
+  function doTipo(linhas, tipo) { return linhas.filter(function (l) { return l.tipo === tipo; }); }
+  function despesasDe(linhas) { return doTipo(linhas, 'despesa'); }
+  function receitasDe(linhas) { return doTipo(linhas, 'receita'); }
+  function investimentosDe(linhas) { return doTipo(linhas, 'investimento'); }
 
   /**
    * Qual lado alimenta os painéis de categoria (rosca, Pareto, mapa de calor…).
-   * Filtrando só receitas, esses painéis passam a analisar receitas.
+   * Filtrando só receitas ou só investimentos, esses painéis analisam aquele lado.
    */
-  function foco() { return estado.filtros.tipo === 'receita' ? 'receita' : 'despesa'; }
-  function dadosFoco(dados) { return foco() === 'receita' ? receitasDe(dados) : despesasDe(dados); }
-  function rotuloFoco(plural) { return foco() === 'receita' ? (plural ? 'receitas' : 'receita') : (plural ? 'despesas' : 'despesa'); }
+  function foco() {
+    var t = estado.filtros.tipo;
+    return (t === 'receita' || t === 'investimento') ? t : 'despesa';
+  }
+  function dadosFoco(dados) { return doTipo(dados, foco()); }
+  function rotuloFoco(plural) {
+    return plural ? Util.TIPO_PLURAL[foco()] : foco();
+  }
+  /** "das despesas" / "das receitas" / "dos investimentos" */
+  function deFoco() {
+    return (foco() === 'investimento' ? 'dos ' : 'das ') + Util.TIPO_PLURAL[foco()];
+  }
+  /** "nas despesas" / "nas receitas" / "nos investimentos" */
+  function emFoco() {
+    return (foco() === 'investimento' ? 'nos ' : 'nas ') + Util.TIPO_PLURAL[foco()];
+  }
 
-  /** Agrega entradas, saídas e saldo por mês. */
+  /** Agrega entradas, saídas, aportes e saldo de caixa por mês. */
   function fluxoPorPeriodo(linhas) {
     var mapa = {};
     linhas.forEach(function (l) {
       if (!mapa[l.periodo]) {
-        mapa[l.periodo] = { periodo: l.periodo, ano: l.ano, mes: l.mes, receitas: 0, despesas: 0, qtd: 0 };
+        mapa[l.periodo] = { periodo: l.periodo, ano: l.ano, mes: l.mes,
+                            receitas: 0, despesas: 0, investimentos: 0, qtd: 0 };
       }
       var p = mapa[l.periodo];
-      if (l.receita) p.receitas += l.valor; else p.despesas += l.valor;
+      if (l.receita) p.receitas += l.valor;
+      else if (l.investimento) p.investimentos += l.valor;
+      else p.despesas += l.valor;
       p.qtd++;
     });
-    var acumulado = 0;
+    var acumulado = 0, investido = 0;
     return Object.keys(mapa).map(function (k) { return mapa[k]; })
       .sort(function (a, b) { return a.periodo - b.periodo; })
       .map(function (p) {
-        p.saldo = p.receitas - p.despesas;
+        p.resultado = p.receitas - p.despesas;              // sobra antes de investir
+        p.saldo = p.resultado - p.investimentos;            // o que ficou em caixa
         acumulado += p.saldo;
+        investido += p.investimentos;
         p.acumulado = acumulado;
-        p.poupanca = p.receitas ? (p.saldo / p.receitas) * 100 : null;
+        p.investido = investido;
+        p.poupanca = p.receitas ? (p.resultado / p.receitas) * 100 : null;
+        p.taxaInvestimento = p.receitas ? (p.investimentos / p.receitas) * 100 : null;
         return p;
       });
   }
@@ -571,12 +602,21 @@
 
     var receitas = Util.soma(receitasDe(dados), function (l) { return l.valor; });
     var despesas = Util.soma(despesasDe(dados), function (l) { return l.valor; });
-    var resumoValores = baseTemReceitas()
-      ? '<span class="ponto"></span><span>Entradas <span class="fr-destaque val-receita">' + Util.moeda(receitas) + '</span></span>' +
+    var aportes = Util.soma(investimentosDe(dados), function (l) { return l.valor; });
+    var caixa = receitas - despesas - aportes;
+    var resumoValores;
+    if (baseTemFluxo()) {
+      resumoValores =
+        '<span class="ponto"></span><span>Entradas <span class="fr-destaque val-receita">' + Util.moeda(receitas) + '</span></span>' +
         '<span class="ponto"></span><span>Saídas <span class="fr-destaque val-despesa">' + Util.moeda(despesas) + '</span></span>' +
-        '<span class="ponto"></span><span>Saldo <span class="fr-destaque ' + (receitas - despesas >= 0 ? 'val-receita' : 'val-despesa') +
-          '">' + Util.moeda(receitas - despesas) + '</span></span>'
-      : '<span class="ponto"></span><span>Total <span class="fr-destaque">' + Util.moeda(despesas + receitas) + '</span></span>';
+        (baseTem('investimento')
+          ? '<span class="ponto"></span><span>Aportes <span class="fr-destaque val-investimento">' + Util.moeda(aportes) + '</span></span>'
+          : '') +
+        '<span class="ponto"></span><span>Caixa <span class="fr-destaque ' + (caixa >= 0 ? 'val-receita' : 'val-despesa') +
+          '">' + Util.moeda(caixa) + '</span></span>';
+    } else {
+      resumoValores = '<span class="ponto"></span><span>Total <span class="fr-destaque">' + Util.moeda(despesas) + '</span></span>';
+    }
 
     $('#filtros-resumo').innerHTML =
       '<span>Exibindo <span class="fr-destaque">' + Util.inteiro(dados.length) + '</span> de ' +
@@ -600,9 +640,20 @@
   var KPIS_FLUXO = [
     { chave: 'receitas', rotulo: 'Receitas', cor: 'var(--ok)', ico: '↑' },
     { chave: 'total', rotulo: 'Despesas', cor: 'var(--erro)', ico: '↓' },
-    { chave: 'saldo', rotulo: 'Saldo do período', cor: 'var(--s1)', ico: '=' },
+    { chave: 'saldo', rotulo: 'Sobra do período', cor: 'var(--s1)', ico: '=' },
     { chave: 'poupanca', rotulo: 'Taxa de poupança', cor: 'var(--s3)', ico: '%' },
     { chave: 'media', rotulo: 'Despesa média/mês', cor: 'var(--s2)', ico: '~' },
+    { chave: 'variacao', rotulo: 'Variação mensal', cor: 'var(--s5)', ico: '%' },
+    { chave: 'lider', rotulo: 'Categoria líder', cor: 'var(--s4)', ico: '★' },
+    { chave: 'extra', rotulo: 'Projeção do ano', cor: 'var(--s7)', ico: '→' }
+  ];
+
+  var KPIS_FLUXO_INV = [
+    { chave: 'receitas', rotulo: 'Receitas', cor: 'var(--ok)', ico: '↑' },
+    { chave: 'total', rotulo: 'Despesas', cor: 'var(--erro)', ico: '↓' },
+    { chave: 'investido', rotulo: 'Investido', cor: 'var(--inv)', ico: '◆' },
+    { chave: 'caixa', rotulo: 'Saldo em caixa', cor: 'var(--s1)', ico: '=' },
+    { chave: 'poupanca', rotulo: 'Taxa de poupança', cor: 'var(--s3)', ico: '%' },
     { chave: 'variacao', rotulo: 'Variação mensal', cor: 'var(--s5)', ico: '%' },
     { chave: 'lider', rotulo: 'Categoria líder', cor: 'var(--s4)', ico: '★' },
     { chave: 'extra', rotulo: 'Projeção do ano', cor: 'var(--s7)', ico: '→' }
@@ -634,10 +685,12 @@
     // modo fluxo de caixa só quando há receitas na seleção
     var receitas = receitasDe(dados);
     var despesas = despesasDe(dados);
+    var aportes = investimentosDe(dados);
     var modoFluxo = receitas.length > 0 && despesas.length > 0;
-    var assinatura = modoFluxo ? 'fluxo' : 'despesa';
+    var comAportes = modoFluxo && aportes.length > 0;
+    var assinatura = comAportes ? 'fluxo-inv' : (modoFluxo ? 'fluxo' : 'despesa');
     if (kpisMontados !== assinatura || !$('#kpi-total')) {
-      montarEsqueletoKPIs(modoFluxo ? KPIS_FLUXO : KPIS_DESPESA, assinatura);
+      montarEsqueletoKPIs(comAportes ? KPIS_FLUXO_INV : (modoFluxo ? KPIS_FLUXO : KPIS_DESPESA), assinatura);
     }
 
     // sem despesas (filtro "só receitas"), os indicadores olham para as receitas
@@ -650,26 +703,42 @@
     var media = total / nMeses;
 
     if (modoFluxo) {
-      var saldo = totalReceitas - total;
-      var poupanca = totalReceitas ? (saldo / totalReceitas) * 100 : 0;
+      var totalAportes = Util.soma(aportes, function (l) { return l.valor; });
+      var sobra = totalReceitas - total;                  // receitas − despesas
+      var caixa = sobra - totalAportes;                   // o que restou fora dos investimentos
+      var poupanca = totalReceitas ? (sobra / totalReceitas) * 100 : 0;
       var mesesFluxo = fluxoPorPeriodo(dados);
-      var negativos = mesesFluxo.filter(function (p) { return p.saldo < 0; }).length;
+      var negativos = mesesFluxo.filter(function (p) { return p.resultado < 0; }).length;
 
       setKPI('receitas', null, Util.moeda(totalReceitas / nMeses) + ' por mês em média', null, totalReceitas);
       setKPI('saldo',
-        '<span class="' + (saldo >= 0 ? 'val-receita' : 'val-despesa') + '">' + Util.moeda(saldo) + '</span>',
+        '<span class="' + (sobra >= 0 ? 'val-receita' : 'val-despesa') + '">' + Util.moeda(sobra) + '</span>',
         negativos ? negativos + ' de ' + mesesFluxo.length + ' meses fecharam no vermelho'
                   : 'todos os ' + mesesFluxo.length + ' meses fecharam positivos');
       setKPI('poupanca',
         '<span class="' + (poupanca >= 0 ? 'val-receita' : 'val-despesa') + '">' + Util.percentual(poupanca) + '</span>',
         'de cada R$ 100 que entram, ' + (poupanca >= 0 ? 'sobram ' : 'faltam ') + Util.moeda(Math.abs(poupanca)));
+
+      if (comAportes) {
+        setKPI('investido',
+          '<span class="val-investimento">' + Util.moeda(totalAportes) + '</span>',
+          Util.percentual(totalReceitas ? (totalAportes / totalReceitas) * 100 : 0) + ' da renda · ' +
+          Util.moeda(totalAportes / nMeses) + ' por mês');
+        setKPI('caixa',
+          '<span class="' + (caixa >= 0 ? 'val-receita' : 'val-despesa') + '">' + Util.moeda(caixa) + '</span>',
+          caixa >= 0 ? 'sobrou em conta depois de gastar e investir'
+                     : 'faltou caixa: os aportes superaram a sobra do período');
+      }
     }
 
-    var soReceitas = !despesas.length && receitas.length > 0;
+    var rotuloTotal = 'Total gasto';
+    if (modoFluxo) rotuloTotal = 'Despesas';
+    else if (!despesas.length && receitas.length) rotuloTotal = 'Total de receitas';
+    else if (!despesas.length && aportes.length) rotuloTotal = 'Total investido';
     setKPI('total', null,
       modoFluxo ? Util.percentual(totalReceitas ? (total / totalReceitas) * 100 : 0) + ' da renda do período'
                 : Util.inteiro(nMeses) + ' ' + (nMeses === 1 ? 'mês com lançamentos' : 'meses com lançamentos'),
-      modoFluxo ? 'Despesas' : (soReceitas ? 'Total de receitas' : 'Total gasto'), total);
+      rotuloTotal, total);
     setKPI('media', null, 'considerando os meses do filtro', null, media);
 
     // variação mês a mês
@@ -700,8 +769,8 @@
       var totalFoco = Util.soma(cats, function (c) { return c.total; });
       setKPI('lider', '<span style="font-size:19px">' + Util.escapar(lider.categoria) + '</span>',
         Util.moeda(lider.total) + ' · ' + Util.percentual(totalFoco ? (lider.total / totalFoco) * 100 : 0) +
-        ' das ' + rotuloFoco(true),
-        'Categoria líder' + (foco() === 'receita' ? ' (receitas)' : ''));
+        ' ' + deFoco(),
+        'Categoria líder' + (foco() === 'despesa' ? '' : ' (' + rotuloFoco(true) + ')'));
     } else {
       setKPI('lider', '—', 'sem dados no filtro');
     }
@@ -733,48 +802,61 @@
     var modoFluxo = receitas.length > 0 && despesas.length > 0;
 
     if (modoFluxo) {
+      var aportes = investimentosDe(dados);
       var fluxo = fluxoPorPeriodo(dados);
       var rotulosF = fluxo.map(function (p) { return Util.rotuloPeriodo(p.mes, p.ano); });
       texto('tit-evolucao', 'Fluxo de caixa mensal');
-      texto('sub-evolucao', 'Entradas acima da linha, saídas abaixo, saldo do mês na linha');
+      texto('sub-evolucao', aportes.length
+        ? 'Entradas acima da linha; saídas e aportes abaixo; saldo em caixa na linha'
+        : 'Entradas acima da linha, saídas abaixo, saldo do mês na linha');
       Graficos.fluxoCaixa({
         rotulos: rotulosF,
         receitas: fluxo.map(function (p) { return p.receitas; }),
         despesas: fluxo.map(function (p) { return p.despesas; }),
+        investimentos: fluxo.map(function (p) { return p.investimentos; }),
+        temInvestimentos: aportes.length > 0,
         saldo: fluxo.map(function (p) { return p.saldo; })
       });
-      texto('tit-acumulado', 'Saldo acumulado');
-      texto('sub-acumulado', 'Quanto sobrou (ou faltou) somando mês a mês');
+      texto('tit-acumulado', aportes.length ? 'Patrimônio investido' : 'Saldo acumulado');
+      texto('sub-acumulado', aportes.length
+        ? 'Soma dos aportes ao longo dos meses selecionados'
+        : 'Quanto sobrou (ou faltou) somando mês a mês');
       Graficos.acumulado({
         rotulos: rotulosF,
-        valores: fluxo.map(function (p) { return p.acumulado; }),
-        cor: fluxo.length && fluxo[fluxo.length - 1].acumulado < 0 ? '#fb7185' : '#34d399',
-        rotulo: 'Saldo acumulado',
-        zero: false
+        valores: fluxo.map(function (p) { return aportes.length ? p.investido : p.acumulado; }),
+        cor: aportes.length ? Util.TIPO_COR.investimento
+          : (fluxo.length && fluxo[fluxo.length - 1].acumulado < 0 ? Util.TIPO_COR.despesa : Util.TIPO_COR.receita),
+        rotulo: aportes.length ? 'Total investido' : 'Saldo acumulado',
+        zero: !aportes.length ? false : true
       });
     } else {
       var base = despesas.length ? despesas : dados;
       var periodos = porPeriodo(base);
       var rotulos = periodos.map(function (p) { return Util.rotuloPeriodo(p.mes, p.ano); });
       var valores = periodos.map(function (p) { return p.total; });
-      var soReceita = !despesas.length && receitas.length;
-      texto('tit-evolucao', soReceita ? 'Evolução das receitas' : 'Evolução dos gastos');
+      var lado = despesas.length ? 'despesa' : foco();
+      var titulos = { receita: ['Evolução das receitas', 'Receita acumulada'],
+                      investimento: ['Evolução dos aportes', 'Patrimônio investido'],
+                      despesa: ['Evolução dos gastos', 'Gasto acumulado'] };
+      texto('tit-evolucao', titulos[lado][0]);
       texto('sub-evolucao', 'Total por mês com média móvel de 3 períodos');
       Graficos.evolucao({ rotulos: rotulos, valores: valores, media: mediaMovel(valores, 3) });
 
-      texto('tit-acumulado', soReceita ? 'Receita acumulada' : 'Gasto acumulado');
+      texto('tit-acumulado', titulos[lado][1]);
       texto('sub-acumulado', 'Soma acumulada ao longo dos meses selecionados');
       var acc0 = 0;
       Graficos.acumulado({
         rotulos: rotulos,
         valores: valores.map(function (v) { acc0 += v; return acc0; }),
-        cor: soReceita ? '#34d399' : null
+        cor: lado === 'despesa' ? null : Util.TIPO_COR[lado]
       });
     }
 
     var cats = porCategoria(dadosFoco(dados));
-    texto('tit-categorias', foco() === 'receita' ? 'Receitas por categoria' : 'Distribuição por categoria');
-    texto('sub-categorias', 'Participação de cada categoria nas ' + rotuloFoco(true) + ' do período');
+    var titulosCat = { receita: 'Receitas por categoria', investimento: 'Investimentos por categoria',
+                       despesa: 'Distribuição por categoria' };
+    texto('tit-categorias', titulosCat[foco()]);
+    texto('sub-categorias', 'Participação de cada categoria ' + emFoco() + ' do período');
     texto('tit-resumo-cat', 'Resumo por categoria · ' + rotuloFoco(true));
     var principais = cats.slice(0, 9);
     var resto = cats.slice(9);
@@ -838,13 +920,17 @@
   function renderFluxo(dados) {
     var fluxo = fluxoPorPeriodo(dados);
     var receitas = receitasDe(dados);
+    var aportes = investimentosDe(dados);
+    var temAportes = aportes.length > 0;
     var totalRec = Util.soma(receitas, function (l) { return l.valor; });
     var totalDesp = Util.soma(despesasDe(dados), function (l) { return l.valor; });
-    var saldo = totalRec - totalDesp;
+    var totalInv = Util.soma(aportes, function (l) { return l.valor; });
+    var resultado = totalRec - totalDesp;
+    var caixa = resultado - totalInv;
     var nMeses = fluxo.length || 1;
-    var negativos = fluxo.filter(function (p) { return p.saldo < 0; });
-    var melhor = fluxo.length ? fluxo.reduce(function (a, b) { return b.saldo > a.saldo ? b : a; }) : null;
-    var pior = fluxo.length ? fluxo.reduce(function (a, b) { return b.saldo < a.saldo ? b : a; }) : null;
+    var negativos = fluxo.filter(function (p) { return p.resultado < 0; });
+    var melhor = fluxo.length ? fluxo.reduce(function (a, b) { return b.resultado > a.resultado ? b : a; }) : null;
+    var pior = fluxo.length ? fluxo.reduce(function (a, b) { return b.resultado < a.resultado ? b : a; }) : null;
 
     $('#fluxo-destaques').innerHTML = !fluxo.length ? '' :
       '<div class="fd-item"><small>Entradas no período</small>' +
@@ -853,19 +939,31 @@
       '<div class="fd-item"><small>Saídas no período</small>' +
         '<strong class="val-despesa">' + Util.moeda(totalDesp) + '</strong>' +
         '<em>' + Util.moeda(totalDesp / nMeses) + ' por mês</em></div>' +
-      '<div class="fd-item"><small>Resultado</small>' +
-        '<strong class="' + (saldo >= 0 ? 'val-receita' : 'val-despesa') + '">' + Util.moeda(saldo) + '</strong>' +
-        '<em>' + Util.moeda(saldo / nMeses) + ' por mês em média</em></div>' +
+      (temAportes
+        ? '<div class="fd-item"><small>Investido no período</small>' +
+          '<strong class="val-investimento">' + Util.moeda(totalInv) + '</strong>' +
+          '<em>' + Util.moeda(totalInv / nMeses) + ' por mês · ' +
+          Util.percentual(totalRec ? (totalInv / totalRec) * 100 : 0) + ' da renda</em></div>'
+        : '') +
+      '<div class="fd-item"><small>' + (temAportes ? 'Sobra (receitas − despesas)' : 'Resultado') + '</small>' +
+        '<strong class="' + (resultado >= 0 ? 'val-receita' : 'val-despesa') + '">' + Util.moeda(resultado) + '</strong>' +
+        '<em>' + Util.moeda(resultado / nMeses) + ' por mês em média</em></div>' +
+      (temAportes
+        ? '<div class="fd-item"><small>Saldo em caixa</small>' +
+          '<strong class="' + (caixa >= 0 ? 'val-receita' : 'val-despesa') + '">' + Util.moeda(caixa) + '</strong>' +
+          '<em>o que ficou livre depois dos aportes</em></div>'
+        : '') +
       '<div class="fd-item"><small>Melhor / pior mês</small>' +
-        '<strong style="font-size:16px">' + (melhor ? Util.rotuloPeriodo(melhor.mes, melhor.ano) + ' · ' + Util.moeda(melhor.saldo, true) : '—') + '</strong>' +
-        '<em>' + (pior ? Util.rotuloPeriodo(pior.mes, pior.ano) + ' · ' + Util.moeda(pior.saldo, true) : '—') +
+        '<strong style="font-size:16px">' + (melhor ? Util.rotuloPeriodo(melhor.mes, melhor.ano) + ' · ' + Util.moeda(melhor.resultado, true) : '—') + '</strong>' +
+        '<em>' + (pior ? Util.rotuloPeriodo(pior.mes, pior.ano) + ' · ' + Util.moeda(pior.resultado, true) : '—') +
         ' · ' + negativos.length + ' mês(es) no vermelho</em></div>';
 
     if (Graficos.disponivel() && fluxo.length) {
       Graficos.saldoMensal({
         rotulos: fluxo.map(function (p) { return Util.rotuloPeriodo(p.mes, p.ano); }),
         saldos: fluxo.map(function (p) { return p.saldo; }),
-        acumulado: fluxo.map(function (p) { return p.acumulado; })
+        acumulado: fluxo.map(function (p) { return p.acumulado; }),
+        investido: temAportes ? fluxo.map(function (p) { return p.investido; }) : null
       });
 
       var catsRec = porCategoria(receitas).slice(0, 10);
@@ -877,6 +975,22 @@
       });
     }
 
+    /* aportes por categoria */
+    var elInv = $('#aportes-categoria');
+    $('#card-aportes').classList.toggle('oculto', !temAportes);
+    if (temAportes) {
+      var catsInv = porCategoria(aportes);
+      elInv.innerHTML = '<thead><tr><th>Onde foi investido</th><th class="num">Total</th>' +
+        '<th class="num">Part.</th><th class="num">Média/mês</th></tr></thead><tbody>' +
+        catsInv.map(function (c) {
+          return '<tr><td class="forte"><i class="pontinho" style="background:' +
+            Util.corDe(c.categoria, indiceCategoria(c.categoria)) + '"></i>' + Util.escapar(c.categoria) + '</td>' +
+            '<td class="num forte val-investimento">' + Util.moeda(c.total) + '</td>' +
+            '<td class="num">' + Util.percentual(totalInv ? (c.total / totalInv) * 100 : 0) + '</td>' +
+            '<td class="num">' + Util.moeda(c.total / nMeses) + '</td></tr>';
+        }).join('') + '</tbody>';
+    }
+
     /* tabela mês a mês */
     var tab = $('#tabela-fluxo');
     if (!fluxo.length) {
@@ -884,22 +998,33 @@
     } else {
       tab.innerHTML =
         '<thead><tr><th>Mês</th><th class="num">Entradas</th><th class="num">Saídas</th>' +
-        '<th class="num">Resultado</th><th class="num">Caixa acumulado</th><th class="num">Poupança</th></tr></thead><tbody>' +
+        (temAportes ? '<th class="num">Aportes</th>' : '') +
+        '<th class="num">' + (temAportes ? 'Sobra' : 'Resultado') + '</th>' +
+        (temAportes ? '<th class="num">Caixa do mês</th>' : '') +
+        '<th class="num">Caixa acumulado</th>' +
+        (temAportes ? '<th class="num">Investido</th>' : '') +
+        '<th class="num">Poupança</th></tr></thead><tbody>' +
         fluxo.map(function (p) {
-          return '<tr class="' + (p.saldo < 0 ? 'negativo' : '') + '">' +
+          return '<tr class="' + (p.resultado < 0 ? 'negativo' : '') + '">' +
             '<td class="desc">' + Util.MESES[p.mes - 1] + '/' + p.ano + '</td>' +
             '<td class="num val-receita">' + Util.moeda(p.receitas) + '</td>' +
             '<td class="num val-despesa">' + Util.moeda(p.despesas) + '</td>' +
-            '<td class="num valor ' + (p.saldo >= 0 ? 'val-receita' : 'val-despesa') + '">' + Util.moeda(p.saldo) + '</td>' +
+            (temAportes ? '<td class="num val-investimento">' + Util.moeda(p.investimentos) + '</td>' : '') +
+            '<td class="num valor ' + (p.resultado >= 0 ? 'val-receita' : 'val-despesa') + '">' + Util.moeda(p.resultado) + '</td>' +
+            (temAportes ? '<td class="num ' + (p.saldo >= 0 ? '' : 'val-despesa') + '">' + Util.moeda(p.saldo) + '</td>' : '') +
             '<td class="num ' + (p.acumulado >= 0 ? '' : 'val-despesa') + '">' + Util.moeda(p.acumulado) + '</td>' +
+            (temAportes ? '<td class="num">' + Util.moeda(p.investido) + '</td>' : '') +
             '<td class="num">' + (p.poupanca == null ? '—' : Util.percentual(p.poupanca, 0)) + '</td></tr>';
         }).join('') + '</tbody>' +
         '<tfoot><tr><td>Total do período</td>' +
         '<td class="num val-receita">' + Util.moeda(totalRec) + '</td>' +
         '<td class="num val-despesa">' + Util.moeda(totalDesp) + '</td>' +
-        '<td class="num ' + (saldo >= 0 ? 'val-receita' : 'val-despesa') + '">' + Util.moeda(saldo) + '</td>' +
-        '<td class="num">' + Util.moeda(saldo) + '</td>' +
-        '<td class="num">' + (totalRec ? Util.percentual((saldo / totalRec) * 100, 0) : '—') + '</td></tr></tfoot>';
+        (temAportes ? '<td class="num val-investimento">' + Util.moeda(totalInv) + '</td>' : '') +
+        '<td class="num ' + (resultado >= 0 ? 'val-receita' : 'val-despesa') + '">' + Util.moeda(resultado) + '</td>' +
+        (temAportes ? '<td class="num ' + (caixa >= 0 ? '' : 'val-despesa') + '">' + Util.moeda(caixa) + '</td>' : '') +
+        '<td class="num">' + Util.moeda(caixa) + '</td>' +
+        (temAportes ? '<td class="num">' + Util.moeda(totalInv) + '</td>' : '') +
+        '<td class="num">' + (totalRec ? Util.percentual((resultado / totalRec) * 100, 0) : '—') + '</td></tr></tfoot>';
     }
 
     /* maiores receitas */
@@ -958,11 +1083,12 @@
     function add(ico, cor, titulo, texto) { itens.push({ ico: ico, cor: cor, titulo: titulo, texto: texto }); }
 
     /* ---- leituras de fluxo de caixa ---- */
-    var receitasSel = receitasDe(todos), despesasSel = despesasDe(todos);
+    var receitasSel = receitasDe(todos), despesasSel = despesasDe(todos), aportesSel = investimentosDe(todos);
     if (receitasSel.length && despesasSel.length) {
       var fluxo = fluxoPorPeriodo(todos);
       var totRec = Util.soma(receitasSel, function (l) { return l.valor; });
       var totDesp = Util.soma(despesasSel, function (l) { return l.valor; });
+      var totInv = Util.soma(aportesSel, function (l) { return l.valor; });
       var resultado = totRec - totDesp;
       var poupanca = totRec ? (resultado / totRec) * 100 : 0;
 
@@ -971,16 +1097,41 @@
         (resultado >= 0 ? 'sobra' : 'déficit') + ' de <strong>' + Util.moeda(Math.abs(resultado)) +
         '</strong> — taxa de poupança de ' + Util.percentual(poupanca) + '.');
 
-      var negativos = fluxo.filter(function (p) { return p.saldo < 0; });
+      if (aportesSel.length) {
+        var caixaFinal = resultado - totInv;
+        add('◆', 'var(--inv)', 'Destino da sobra',
+          'Dos ' + Util.moeda(Math.max(0, resultado)) + ' que sobraram, <strong>' + Util.moeda(totInv) +
+          '</strong> foram investidos (' + Util.percentual(totRec ? (totInv / totRec) * 100 : 0) +
+          ' da renda) e ' + (caixaFinal >= 0 ? 'restaram ' + Util.moeda(caixaFinal) + ' em caixa.'
+            : 'faltaram ' + Util.moeda(Math.abs(caixaFinal)) + ' — parte dos aportes veio de caixa anterior.'));
+
+        var catsInv = porCategoria(aportesSel);
+        if (catsInv.length) {
+          add('▦', 'var(--s6)', 'Carteira do período',
+            '<strong>' + Util.escapar(catsInv[0].categoria) + '</strong> recebeu ' +
+            Util.percentual(totInv ? (catsInv[0].total / totInv) * 100 : 0) + ' dos aportes' +
+            (catsInv.length > 1 ? ', distribuídos em ' + catsInv.length + ' destinos diferentes.' : '.'));
+        }
+
+        var mesesComAporte = fluxo.filter(function (p) { return p.investimentos > 0; }).length;
+        if (mesesComAporte >= 2) {
+          add('↗', 'var(--inv)', 'Constância dos aportes',
+            'Você investiu em <strong>' + mesesComAporte + ' de ' + fluxo.length + ' meses</strong>, com média de ' +
+            Util.moeda(totInv / mesesComAporte) + ' por aporte mensal. No ritmo atual, 12 meses somam ' +
+            Util.moeda((totInv / fluxo.length) * 12) + '.');
+        }
+      }
+
+      var negativos = fluxo.filter(function (p) { return p.resultado < 0; });
       if (negativos.length) {
-        var piorMes = negativos.reduce(function (a, b) { return b.saldo < a.saldo ? b : a; });
+        var piorMes = negativos.reduce(function (a, b) { return b.resultado < a.resultado ? b : a; });
         add('!', 'var(--alerta)', 'Meses no vermelho',
           '<strong>' + negativos.length + ' de ' + fluxo.length + ' meses</strong> fecharam negativos. O pior foi ' +
-          Util.rotuloPeriodo(piorMes.mes, piorMes.ano) + ', com ' + Util.moeda(piorMes.saldo) + '.');
+          Util.rotuloPeriodo(piorMes.mes, piorMes.ano) + ', com ' + Util.moeda(piorMes.resultado) + '.');
       } else if (fluxo.length > 1) {
         add('✓', 'var(--ok)', 'Todos os meses positivos',
           'Nos ' + fluxo.length + ' meses do filtro as entradas superaram as saídas. O menor colchão foi de ' +
-          Util.moeda(fluxo.reduce(function (a, b) { return b.saldo < a.saldo ? b : a; }).saldo) + '.');
+          Util.moeda(fluxo.reduce(function (a, b) { return b.resultado < a.resultado ? b : a; }).resultado) + '.');
       }
 
       var catsRec = porCategoria(receitasSel);
@@ -1008,7 +1159,7 @@
       var l0 = cats[0];
       add('★', 'var(--s4)', 'Categoria líder',
         '<strong>' + Util.escapar(l0.categoria) + '</strong> concentra ' +
-        Util.percentual(total ? (l0.total / total) * 100 : 0) + ' das ' + rotuloFoco(true) + ' (' + Util.moeda(l0.total) +
+        Util.percentual(total ? (l0.total / total) * 100 : 0) + ' ' + deFoco() + ' (' + Util.moeda(l0.total) +
         ' em ' + Util.inteiro(l0.qtd) + ' lançamentos).');
     }
 
@@ -1291,10 +1442,14 @@
 
   function renderTabela() {
     var dados = estado.cacheFiltrado || filtradas();
-    var comTipo = baseTemReceitas();
-    var totalReceitas = Util.soma(receitasDe(dados), function (l) { return l.valor; });
-    var totalDespesas = Util.soma(despesasDe(dados), function (l) { return l.valor; });
-    var total = totalReceitas + totalDespesas;
+    var comTipo = baseTemFluxo();
+    var totaisTipo = {
+      receita: Util.soma(receitasDe(dados), function (l) { return l.valor; }),
+      despesa: Util.soma(despesasDe(dados), function (l) { return l.valor; }),
+      investimento: Util.soma(investimentosDe(dados), function (l) { return l.valor; })
+    };
+    var totalReceitas = totaisTipo.receita, totalDespesas = totaisTipo.despesa;
+    var total = totalReceitas + totalDespesas + totaisTipo.investimento;
     var ordenadas = ordenar(dados);
 
     $('#tabela').classList.toggle('com-tipo', comTipo);
@@ -1313,7 +1468,8 @@
 
     $('#tabela-sub').textContent = Util.inteiro(ordenadas.length) + ' lançamentos filtrados · ' +
       (comTipo
-        ? Util.moeda(totalReceitas) + ' em entradas e ' + Util.moeda(totalDespesas) + ' em saídas'
+        ? Util.moeda(totalReceitas) + ' em entradas, ' + Util.moeda(totalDespesas) + ' em saídas' +
+          (totaisTipo.investimento ? ' e ' + Util.moeda(totaisTipo.investimento) + ' investidos' : '')
         : Util.moeda(total) + ' no total');
 
     var corpo = $('#tabela-corpo');
@@ -1325,17 +1481,17 @@
     }
 
     corpo.innerHTML = pagina.map(function (l) {
-      var base = l.receita ? totalReceitas : totalDespesas;
+      var base = totaisTipo[l.tipo];
       var pct = base ? (l.valor / base) * 100 : 0;
       var cor = Util.corDe(l.categoria, indiceCategoria(l.categoria));
       return '<tr>' +
         '<td class="desc">' + Util.escapar(l.descricao) + '</td>' +
         '<td class="col-tipo"><span class="badge-tipo ' + l.tipo + '">' +
-          (l.receita ? '↑ Receita' : '↓ Despesa') + '</span></td>' +
+          Util.TIPO_SETA[l.tipo] + ' ' + Util.TIPO_ROTULO[l.tipo] + '</span></td>' +
         '<td><span class="badge-cat"><i class="pontinho" style="background:' + cor + '"></i>' +
           Util.escapar(l.categoria) + '</span></td>' +
         '<td>' + Util.MESES[l.mes - 1] + '/' + l.ano + '</td>' +
-        '<td class="num valor' + (comTipo ? (l.receita ? ' val-receita' : ' val-despesa') : '') + '">' +
+        '<td class="num valor' + (comTipo ? ' val-' + l.tipo : '') + '">' +
           (comTipo ? (l.receita ? '+' : '−') + ' ' : '') + Util.moeda(l.valor) + '</td>' +
         '<td class="num">' + Util.percentual(pct, 2) +
           '<span class="mini-barra"><i style="width:' + Math.min(100, pct * 4) + '%;background:' + cor + '"></i></span></td>' +
@@ -1344,7 +1500,7 @@
 
     var somaPagina = Util.soma(pagina, function (l) { return l.sinal; });
     $('#tabela-rodape').innerHTML = '<tr><td colspan="' + (comTipo ? 4 : 3) + '">' +
-      (comTipo ? 'Saldo desta página' : 'Soma desta página') + ' (' + pagina.length + ' linhas)</td>' +
+      (comTipo ? 'Efeito no caixa desta página' : 'Soma desta página') + ' (' + pagina.length + ' linhas)</td>' +
       '<td class="num ' + (comTipo ? (somaPagina >= 0 ? 'val-receita' : 'val-despesa') : '') + '">' +
       Util.moeda(comTipo ? somaPagina : Math.abs(somaPagina)) + '</td><td class="num">' +
       Util.percentual(total ? (Math.abs(somaPagina) / total) * 100 : 0) + '</td></tr>';
@@ -1489,7 +1645,7 @@
           String(l.valor.toFixed(2)).replace('.', ','),
           '"' + String(l.categoria).replace(/"/g, '""') + '"',
           l.mes, l.ano,
-          l.receita ? 'Receita' : 'Despesa'
+          Util.TIPO_ROTULO[l.tipo]
         ].join(';'));
       });
       Util.baixarTexto(linhas.join('\r\n'), 'finlytics-lancamentos-' + Util.carimboArquivo() + '.csv', 'text/csv');
@@ -1521,7 +1677,7 @@
 
       var aba1 = XLSX.utils.json_to_sheet(dados.map(function (l) {
         return { 'Descrição do gasto': l.descricao, 'Valor': l.valor, 'Categoria': l.categoria,
-                 'Mês': l.mes, 'Ano': l.ano, 'Tipo': l.receita ? 'Receita' : 'Despesa' };
+                 'Mês': l.mes, 'Ano': l.ano, 'Tipo': Util.TIPO_ROTULO[l.tipo] };
       }));
       aba1['!cols'] = [{ wch: 38 }, { wch: 13 }, { wch: 20 }, { wch: 7 }, { wch: 8 }, { wch: 11 }];
       XLSX.utils.book_append_sheet(wb, aba1, 'Lançamentos');
@@ -1559,17 +1715,32 @@
           return {
             'Ano': p.ano, 'Mês': p.mes, 'Mês/Ano': Util.rotuloPeriodo(p.mes, p.ano),
             'Receitas': +p.receitas.toFixed(2), 'Despesas': +p.despesas.toFixed(2),
-            'Saldo do mês': +p.saldo.toFixed(2), 'Caixa acumulado': +p.acumulado.toFixed(2),
+            'Investimentos': +p.investimentos.toFixed(2),
+            'Sobra (rec. - desp.)': +p.resultado.toFixed(2),
+            'Saldo em caixa': +p.saldo.toFixed(2), 'Caixa acumulado': +p.acumulado.toFixed(2),
+            'Total investido': +p.investido.toFixed(2),
             'Taxa de poupança (%)': p.poupanca == null ? '' : +p.poupanca.toFixed(2)
           };
         }));
-        abaFluxo['!cols'] = [{ wch: 8 }, { wch: 7 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 15 }, { wch: 17 }, { wch: 19 }];
+        abaFluxo['!cols'] = [{ wch: 8 }, { wch: 7 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 15 },
+                             { wch: 19 }, { wch: 15 }, { wch: 17 }, { wch: 16 }, { wch: 19 }];
         XLSX.utils.book_append_sheet(wb, abaFluxo, 'Fluxo de caixa');
         nAbas = 5;
       }
 
+      var aportesExp = investimentosDe(dados);
+      if (aportesExp.length) {
+        var abaInv = XLSX.utils.json_to_sheet(porCategoria(aportesExp).map(function (c) {
+          return { 'Onde foi investido': c.categoria, 'Total': +c.total.toFixed(2),
+                   'Média por mês': +c.media.toFixed(2), 'Aportes': c.qtd };
+        }));
+        abaInv['!cols'] = [{ wch: 26 }, { wch: 14 }, { wch: 15 }, { wch: 11 }];
+        XLSX.utils.book_append_sheet(wb, abaInv, 'Investimentos');
+        nAbas++;
+      }
+
       XLSX.writeFile(wb, 'finlytics-analise-' + Util.carimboArquivo() + '.xlsx');
-      UI.toast('Excel exportado', nAbas + ' abas' + (nAbas === 5 ? ', incluindo o fluxo de caixa mês a mês.' : ': lançamentos, por categoria e por mês.'), 'sucesso');
+      UI.toast('Excel exportado', nAbas + ' abas' + (nAbas > 3 ? ', incluindo o fluxo de caixa mês a mês.' : ': lançamentos, por categoria e por mês.'), 'sucesso');
     }
   }
 

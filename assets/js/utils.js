@@ -29,8 +29,15 @@
                                        maximumFractionDigits: casas == null ? 1 : casas }) + '%';
   }
 
+  var TIPOS = ['receita', 'despesa', 'investimento'];
+
+  var TIPO_ROTULO = { receita: 'Receita', despesa: 'Despesa', investimento: 'Investimento' };
+  var TIPO_PLURAL = { receita: 'receitas', despesa: 'despesas', investimento: 'investimentos' };
+  var TIPO_COR = { receita: '#34d399', despesa: '#fb7185', investimento: '#a78bfa' };
+  var TIPO_SETA = { receita: '↑', despesa: '↓', investimento: '◆' };
+
   /**
-   * Classifica o conteúdo da coluna "Tipo" em 'receita' ou 'despesa'.
+   * Classifica o conteúdo da coluna "Tipo" em 'receita', 'despesa' ou 'investimento'.
    * Devolve null quando não reconhece — o chamador decide o padrão.
    */
   function paraTipo(v) {
@@ -38,6 +45,8 @@
     if (typeof v === 'number') return v > 0 ? 'receita' : (v < 0 ? 'despesa' : null);
     var n = normalizar(v).replace(/[().]/g, '').trim();
     if (!n) return null;
+    if (n === 'i' || n === 'inv') return 'investimento';
+    if (/invest|aporte|aplicac|previdenc|poupanc|patrimoni|reserva/.test(n)) return 'investimento';
     if (n === '+' || n === 'r' || n === 'c' || n === 'e') return 'receita';
     if (n === '-' || n === 'd' || n === 's') return 'despesa';
     if (/receit|entrad|credit|ganho|provent|renda|salari|recebiment|income|revenue/.test(n)) return 'receita';
@@ -45,7 +54,7 @@
     return null;
   }
 
-  /** Valor com sinal: receita soma, despesa subtrai. */
+  /** Valor com sinal no caixa: receita entra, despesa e aporte saem. */
   function comSinal(linha) {
     return linha.tipo === 'receita' ? linha.valor : -linha.valor;
   }
@@ -261,7 +270,9 @@
         window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     var ini = performance.now(), dur = duracao || 550;
     function passo(agora) {
-      var t = Math.min(1, (agora - ini) / dur);
+      // o timestamp do frame pode vir antes de `ini` quando a aba volta do
+      // segundo plano; sem o piso em 0 o progresso fica negativo
+      var t = Math.min(1, Math.max(0, (agora - ini) / dur));
       var e = 1 - Math.pow(1 - t, 3);
       el.textContent = formatar(de + (ate - de) * e);
       if (t < 1) requestAnimationFrame(passo);
@@ -284,6 +295,8 @@
 
   global.Util = {
     MESES: MESES, MESES_ABREV: MESES_ABREV, PALETA: PALETA,
+    TIPOS: TIPOS, TIPO_ROTULO: TIPO_ROTULO, TIPO_PLURAL: TIPO_PLURAL,
+    TIPO_COR: TIPO_COR, TIPO_SETA: TIPO_SETA,
     moeda: moeda, inteiro: inteiro, percentual: percentual,
     normalizar: normalizar, titulo: titulo,
     paraTipo: paraTipo, comSinal: comSinal,
